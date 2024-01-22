@@ -1,6 +1,6 @@
 import serial
 import csv
-import time
+#import time
 
 # Serial port configuration
 port = "COM6"  # Change this to your Arduino's serial port
@@ -8,43 +8,82 @@ baud_rate = 9600
 
 # CSV file configuration
 csv_file = "output.csv"
-csv_headers = ["Timestamp", "PPM", "Temperature"]
+csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Humidity", "Latitude", "Longitude"] #Define the headers for the CSV
 
 def read_serial_data():
     with serial.Serial(port, baud_rate, timeout=1) as ser, open(csv_file, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(csv_headers)  # Writing the header
 
-        ppm_value = None
+        # Initialize variables
+        time_value = None
         temperature_value = None
+        pressure_value = None
+        altitude_value = None
+        humidity_value = None
+        latitude_value = None
+        longitude_value = None
 
         try:
             while True:
                 if ser.in_waiting > 0:
                     data_line = ser.readline().decode('utf-8').rstrip()
-                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                    #timestamp = time.strftime("%Y-%m-%d %H:%M:%S") | not gonna use this
 
                     sensor_type, sensor_value = parse_data(data_line)
-                    if sensor_type == "PPM":
-                        ppm_value = sensor_value
+                    #Assign the sensor values
+                    if sensor_type == "Time":
+                        time_value = sensor_value
+                    #elif sensor_type == "PPM":
+                    #    ppm_value = sensor_value | was using a MQ-7 to test in class
                     elif sensor_type == "Temperature":
                         temperature_value = sensor_value
+                    elif sensor_type == "Pressure":
+                        pressure_value = sensor_value
+                    elif sensor_type == "Altitude":
+                        altitude_value = sensor_value
+                    elif sensor_type == "Humidity":
+                        humidity_value = sensor_value
+                    elif sensor_type == "Latitude":
+                        latitude_value = sensor_value
+                    elif sensor_type == "Longitude":
+                        longitude_value = sensor_value
 
                     if ppm_value is not None and temperature_value is not None:
-                        writer.writerow([timestamp, ppm_value, temperature_value])
-                        print(f"{timestamp}, PPM: {ppm_value}, Temperature: {temperature_value}")
+                        writer.writerow([time_value, temperature_value, pressure_value, altitude_value, humidity_value, latitude_value, longitude_value]) #Write it in the csv file in the desired order (must match csv_headers order)
+                        print("-----------------------")
+                        print(f"Time: {time_value}, Temperature: {temperature_value}, Pressure: {pressure_value}") #Print 2 by 2 so its more clear in the console aswell ig
+                        print(f"Time: {time_value}, Altitude: {altitude_value}, Humidity: {humidity_value}")
+                        print(f"Time: {time_value}, Latitude: {latitude_value}, Longitude: {longitude_value}")
+                        print("-----------------------")
                         # Reset the values after writing to the CSV
-                        ppm_value = None
+                        time_value = None
                         temperature_value = None
+                        pressure_value = None
+                        altitude_value = None
+                        humidity_value = None
+                        latitude_value = None
+                        longitude_value = None
                         
-        except KeyboardInterrupt:
+        except KeyboardInterrupt: #Don't press anything and don't mess it uppp!!!
             print("Data collection stopped by user.")
 
+#Parse the data, check what data it is, split it and remove the Data= and only save the value to the corresponding row in the csv
 def parse_data(data_line):
-    if "PPM=" in data_line:
-        return "PPM", data_line.split("PPM=")[-1].strip()
+    if "Time=" in data_line:
+        return "Time", data_line.split("Time=")[-1].strip()
     elif "Temperature=" in data_line:
         return "Temperature", data_line.split("Temperature=")[-1].strip()
+    elif "Pressure=" in data_line:
+        return "Pressure", data_line.split("Pressure=")[-1].strip()
+    elif "Altitude=" in data_line:
+        return "Altitude", data_line.split("Altitude=")[-1].strip()
+    elif "Humidity=" in data_line:
+        return "Humidity", data_line.split("Humidity=")[-1].strip()
+    elif "Latitude=" in data_line:
+        return "Latitude", data_line.split("Latitude=")[-1].strip()
+    elif "Longitude=" in data_line:
+        return "Longitude", data_line.split("Longitude=")[-1].strip()
     return None, None
 
 if __name__ == "__main__":

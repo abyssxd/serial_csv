@@ -1,6 +1,9 @@
 # Serial to CSV converter
 This is a converter that converts the incoming serial data sent by the Vila2Sat's CanSat into the CSV format so that the Vila2Sat Dashboard can read and display the data correctly.
 
+## Integrated Serial Monitor
+This uses its own serial monitor using `pyserial`, it makes the serial monitor show up in the terminal you run the converter in, and while its being monitored, it updates and saves to the output csv file.
+
 ## DashBoard
 You can find the Vila2Sat Dashboard this converts the data for here -> https://github.com/abyssxd/cansat_vila2sat
 

@@ -1,5 +1,5 @@
 # Vila2Sat Serial
-- Is literally a serial monitor.
+- This is literally a serial monitor.
 - Converts the incoming serial data sent by the Vila2Sat's CanSat into the CSV format for the Vila2Sat Dashboard.
 - Converts the incoming serial data sent by the Vila2Sat's CanSat into the KML format to track the Vila2Sat Cansat in Google Earth 3D View.
 

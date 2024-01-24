@@ -1,2 +1,2 @@
-python conv_gui.py
+python serial_gui.py
 PAUSE

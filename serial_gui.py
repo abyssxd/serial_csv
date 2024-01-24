@@ -182,6 +182,14 @@ def read_serial_data(text_widget, stop_event):
         add_data_to_text_widget(text_widget, f"Error: {e}")
 
 
+def reset_csv():
+    global csv_file, csv_headers
+    if os.path.exists(csv_file):
+        os.remove(csv_file)
+    with open(csv_file, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(csv_headers)
+
 # Tkinter UI setup
 def setup_ui():
     root = tk.Tk()
@@ -193,26 +201,34 @@ def setup_ui():
     else:  # For MacOS and Linux
         root.attributes('-fullscreen', True)
 
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
+    # Top frame for buttons
+    top_frame = tk.Frame(root)
+    top_frame.pack(side=tk.TOP, fill=tk.X, pady=20)
 
-    width_percentage = 90
-    height_percentage = 90
-    text_widget_width = int(screen_width * width_percentage / 105)
-    text_widget_height = int(screen_height * height_percentage / 120)
+    # Frame for Start and Stop buttons in the center
+    center_frame = tk.Frame(top_frame)
+    center_frame.pack(side=tk.TOP)
 
-    text_widget = tk.Text(root, height=text_widget_height // 15, width=text_widget_width // 7, state=tk.DISABLED)
-    text_widget.pack(pady=10)
+    # Text widget in the remaining space
+    text_widget = tk.Text(root, state=tk.DISABLED)
+    text_widget.pack(expand=True, fill=tk.BOTH)
 
+    # Event object to control the reading thread
     stop_event = threading.Event()
 
-    start_button = tk.Button(root, text="Start Reading", command=lambda: threading.Thread(target=read_serial_data, args=(text_widget, stop_event), daemon=True).start())
-    start_button.pack(pady=10)
+    # Start and Stop buttons
+    start_button = tk.Button(center_frame, text="Start Reading", command=lambda: threading.Thread(target=read_serial_data, args=(text_widget, stop_event), daemon=True).start())
+    start_button.pack(side=tk.LEFT, padx=5)
 
-    stop_button = tk.Button(root, text="Stop Reading", command=lambda: stop_event.set())
-    stop_button.pack(pady=10)
+    stop_button = tk.Button(center_frame, text="Stop Reading", command=lambda: stop_event.set())
+    stop_button.pack(side=tk.LEFT, padx=5)
+
+    # Reset button aligned to the right
+    reset_button = tk.Button(top_frame, text="Reset CSV", command=reset_csv, bg='red', fg='white')
+    reset_button.pack(side=tk.RIGHT, padx=10)
 
     root.mainloop()
+
 
 if __name__ == "__main__":
     setup_ui()

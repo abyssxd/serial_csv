@@ -1,2 +1,2 @@
-python csv_conv.py
+python serial_terminal.py
 PAUSE

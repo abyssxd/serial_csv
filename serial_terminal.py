@@ -1,4 +1,4 @@
-import serial
+import serial_terminal
 import csv
 import simplekml
 import shutil
@@ -91,7 +91,7 @@ def read_serial_data():
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
 
-    with serial.Serial(port, baud_rate, timeout=1) as ser, open(csv_file, 'w', newline='') as file:
+    with serial_terminal.Serial(port, baud_rate, timeout=1) as ser, open(csv_file, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(csv_headers)  # Writing the header
 

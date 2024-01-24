@@ -11,7 +11,7 @@ This uses its own serial monitor using `pyserial`, it makes the serial monitor s
 This uses its own serial monitor using `pyserial`, it makes the serial monitor show up in the terminal you run the converter in, and while its being monitored, it updates and saves to the output csv file.
 - Use `python serial_gui` to open the GUI serial monitor (both save and update the csv & kml files)
 ### Vila2Sat Serial GUI
-![alt text](https://cdn.discordapp.com/attachments/773822498717696030/1199809505387630694/image.png)
+![alt text](https://cdn.discordapp.com/attachments/773822498717696030/1199833004458135643/image.png)
 
 ## Google Earth Screenshots
 ***This track was made using fake data for visual representation.***

@@ -51,7 +51,7 @@ def load_existing_data(csv_file):
             next(reader)  # Skip header
             for row in reader:
                 try:
-                    lat, lon, alt = float(row[5]), float(row[6]), float(row[3])
+                    lat, lon, alt = float(row[4]), float(row[5]), float(row[3])
                     coordinates.append((lon, lat, alt))
                 except ValueError:
                     continue  # Skip rows with invalid data

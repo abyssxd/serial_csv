@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 # Serial port configuration
-port = "COM6"  # Change this to your Arduino's serial port
+port = "COM3"  # Change this to your Arduino's serial port
 baud_rate = 9600
 
 #Create the KML File with certain settings
@@ -26,14 +26,15 @@ def update_kml(kml, linestring, coordinates, last_coordinate):
     linestring.extrude = 0
     linestring.tessellate = 0
 
-    kml.lookat.longitude = last_coordinate[0]
-    kml.lookat.latitude = last_coordinate[1]
-    kml.lookat.altitude = last_coordinate[2] + 10
-    kml.lookat.heading = 0
-    kml.lookat.tilt = 45
-    kml.lookat.range = 20
-    kml.lookat.altitudemode = simplekml.AltitudeMode.absolute
-
+    lookat = simplekml.LookAt(longitude=last_coordinate[0],
+                              latitude=last_coordinate[1],
+                              altitude=last_coordinate[2] + 10,
+                              heading=0,
+                              tilt=45,
+                              range=20,
+                              altitudemode=simplekml.AltitudeMode.absolute)
+    
+    kml.document.lookat = lookat
     kml.save("live_track.kml")
 
 
@@ -79,7 +80,7 @@ def update_backup_files(backup_csv_file, backup_kml_file):
 
 
 # CSV file configuration
-csv_file = "output.csv"
+csv_file = "sheet.csv"
 csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude"] #Define the headers for the CSV
 
 def read_serial_data():
@@ -94,9 +95,6 @@ def read_serial_data():
         writer = csv.writer(file)
         writer.writerow(csv_headers)  # Writing the header
 
-        # Initialize variables
-        sensor_values = {key: None for key in csv_headers}
-        
         # Initialize variables
         time_value = None
         temperature_value = None
@@ -127,9 +125,24 @@ def read_serial_data():
 
                     if time_value is not None and temperature_value is not None and pressure_value is not None and altitude_value is not None and latitude_value is not None and longitude_value is not None:
                         altitude_value_float = float(altitude_value)
-                        coordinates.append((float(longitude_value), float(latitude_value), altitude_value_float))  # Altitude is 0
-                        update_kml(linestring, coordinates)
-                        writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value]) #Write it in the csv file in the desired order (must match csv_headers order)
+                        new_coords = (float(longitude_value), float(latitude_value), altitude_value_float)
+                        coordinates.append(new_coords)  # Altitude is 0
+
+                        # Update KML
+                        update_kml(kml, linestring, coordinates, new_coords)
+                        
+                        # Open CSV, append data, close CSV
+                        with open(csv_file, 'a', newline='') as file:
+                            writer = csv.writer(file)
+                            writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value])
+                        
+                        # Print data
+                        print("Data processed and saved")
+
+                        # Update backup files
+                        update_backup_files(backup_csv_file, backup_kml_file)
+
+
                         print("-----------------------")
                         print(f"Time: {time_value}, Temperature: {temperature_value}, Pressure: {pressure_value}, Altitude: {altitude_value}") #Print seperate lines so its more clear in the console aswell ig
                         print(f"Time: {time_value}, Latitude: {latitude_value}, Longitude: {longitude_value}")

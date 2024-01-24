@@ -3,8 +3,15 @@
 - Converts the incoming serial data sent by the Vila2Sat's CanSat into the CSV format for the Vila2Sat Dashboard.
 - Converts the incoming serial data sent by the Vila2Sat's CanSat into the KML format to track the Vila2Sat Cansat in Google Earth 3D View.
 
-## Integrated Serial Monitor
+## Integrated Terminal Serial Monitor
 This uses its own serial monitor using `pyserial`, it makes the serial monitor show up in the terminal you run the converter in, and while its being monitored, it updates and saves to the output csv file.
+- Use `python serial` to open the terminal serial monitor (both save and update the csv & kml files)
+
+## Integrated GUI Serial Monitor
+This uses its own serial monitor using `pyserial`, it makes the serial monitor show up in the terminal you run the converter in, and while its being monitored, it updates and saves to the output csv file.
+- Use `python serial_gui` to open the GUI serial monitor (both save and update the csv & kml files)
+### Vila2Sat Serial GUI
+![alt text](https://cdn.discordapp.com/attachments/773822498717696030/1199809505387630694/image.png)
 
 ## Google Earth Screenshots
 ***This track was made using fake data for visual representation.***

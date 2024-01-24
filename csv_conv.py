@@ -37,15 +37,21 @@ def update_kml(kml, linestring, coordinates, last_coordinate):
     kml.save("live_track.kml")
 
 
+def is_csv_empty(file_path):
+    with open(file_path, 'r', newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        next(reader, None)  # Skip header
+        return not any(reader)  # Check if there's any data after the header
+
 def load_existing_data(csv_file):
     coordinates = []
-    if os.path.exists(csv_file):
+    if os.path.exists(csv_file) and not is_csv_empty(csv_file):
         with open(csv_file, 'r', newline='') as file:
             reader = csv.reader(file)
             next(reader)  # Skip header
             for row in reader:
                 try:
-                    lat, lon, alt = float(row[4]), float(row[5]), float(row[3])
+                    lat, lon, alt = float(row[5]), float(row[6]), float(row[3])
                     coordinates.append((lon, lat, alt))
                 except ValueError:
                     continue  # Skip rows with invalid data
@@ -88,6 +94,9 @@ def read_serial_data():
         writer = csv.writer(file)
         writer.writerow(csv_headers)  # Writing the header
 
+        # Initialize variables
+        sensor_values = {key: None for key in csv_headers}
+        
         # Initialize variables
         time_value = None
         temperature_value = None

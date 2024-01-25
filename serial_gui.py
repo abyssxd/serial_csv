@@ -27,6 +27,7 @@ def update_kml(kml, linestring, coordinates, last_coordinate):
     linestring.extrude = 0
     linestring.tessellate = 0
 
+    #Lookat config, used to set how the camera looks at the coordinates of the cansat.
     lookat = simplekml.LookAt(longitude=last_coordinate[0],
                               latitude=last_coordinate[1],
                               altitude=last_coordinate[2] + 10,
@@ -35,15 +36,17 @@ def update_kml(kml, linestring, coordinates, last_coordinate):
                               range=20,
                               altitudemode=simplekml.AltitudeMode.absolute)
     
-    kml.document.lookat = lookat
-    kml.save("live_track.kml")
+    kml.document.lookat = lookat # add the lookat falues from earlier to the kml document
+    kml.save("live_track.kml") # save the kml file
 
+# Check if the csv file is empty
 def is_csv_empty(file_path):
     with open(file_path, 'r', newline='') as csvfile:
         reader = csv.reader(csvfile)
         next(reader, None)  # Skip header
         return not any(reader)  # Check if there's any data after the header
 
+#load existing csv data if the csv file exists and add them to the kml file.
 def load_existing_data(csv_file):
     coordinates = []
     if os.path.exists(csv_file) and not is_csv_empty(csv_file):
@@ -58,6 +61,7 @@ def load_existing_data(csv_file):
                     continue
     return coordinates
 
+# a backup system just in case.
 def create_backup_files(csv_file, kml_file):
     backup_folder = 'backup'
     if not os.path.exists(backup_folder):
@@ -74,10 +78,13 @@ def create_backup_files(csv_file, kml_file):
 
     return backup_csv_file, backup_kml_file
 
+# function update the backup files
 def update_backup_files(backup_csv_file, backup_kml_file):
     shutil.copy("output.csv", backup_csv_file)
     shutil.copy("live_track.kml", backup_kml_file)
 
+# function to parse the incoming serial data coming from the cansat
+# the data is sent like "Temperature= 25" and it strips the "Temperature= " & saves just the numeric value into the temperature row in the csv file
 def parse_data(data_line):
     if "Time=" in data_line:
         return "Time", data_line.split("Time=")[-1].strip()
@@ -93,6 +100,7 @@ def parse_data(data_line):
         return "Longitude", data_line.split("Longitude=")[-1].strip()
     return None, None
 
+#Fuction to add the incoming serial data to the text field/widget in the tkinter gui
 def add_data_to_text_widget(text_widget, data):
     text_widget.config(state=tk.NORMAL)  # Temporarily enable the widget to modify it
     text_widget.insert(tk.END, data + '\n')  # Add data
@@ -103,17 +111,19 @@ def add_data_to_text_widget(text_widget, data):
 csv_file = "output.csv"
 csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude"]
 
+#fuction to start reading the serial data
 def read_serial_data(text_widget, stop_event):
     kml, linestring = create_kml()
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
-    try:
+    try: #try and except to print an error int the text widget if something's wrong with the serial reader
         ser = serial.Serial(port, baud_rate, timeout=1)
         with ser, open(csv_file, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(csv_headers)
 
+            # Initialize variables that store the values of the sensor & gps dta.
             time_value = None
             temperature_value = None
             pressure_value = None
@@ -141,6 +151,7 @@ def read_serial_data(text_widget, stop_event):
                 elif sensor_type == "Longitude":
                         longitude_value = sensor_value
 
+                # Make sure these values aren't none/null so that it doesn't fuck up anything
                 if time_value is not None and temperature_value is not None and pressure_value is not None and altitude_value is not None and latitude_value is not None and longitude_value is not None:
                     altitude_value_float = float(altitude_value)
                     new_coords = (float(longitude_value), float(latitude_value), altitude_value_float)
@@ -160,7 +171,7 @@ def read_serial_data(text_widget, stop_event):
                     # Update backup files
                     update_backup_files(backup_csv_file, backup_kml_file)
 
-
+                    # Print the amazing values
                     print("-----------------------")
                     print(f"Time: {time_value}, Temperature: {temperature_value}, Pressure: {pressure_value}, Altitude: {altitude_value}") #Print seperate lines so its more clear in the console aswell ig
                     print(f"Time: {time_value}, Latitude: {latitude_value}, Longitude: {longitude_value}")
@@ -174,6 +185,7 @@ def read_serial_data(text_widget, stop_event):
                     latitude_value = None
                     longitude_value = None
 
+                    # Update the backup files
                     update_backup_files(backup_csv_file, backup_kml_file)
 
     except serial.SerialException as e:
@@ -182,6 +194,7 @@ def read_serial_data(text_widget, stop_event):
         add_data_to_text_widget(text_widget, f"Error: {e}")
 
 
+# function to reset the csv file with the button
 def reset_csv():
     global csv_file, csv_headers
     if os.path.exists(csv_file):

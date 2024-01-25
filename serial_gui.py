@@ -8,7 +8,7 @@ import tkinter as tk
 import threading
 
 # Serial port configuration
-port = "COM1"  # Change this to your Arduino's serial port
+port = "COM3"  # Change this to your Arduino's serial port
 baud_rate = 9600
 
 # Create the KML File with certain settings

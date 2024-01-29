@@ -111,108 +111,69 @@ def add_data_to_text_widget(text_widget, data):
 csv_file = "output.csv"
 csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude"]
 
-#fuction to start reading the serial data
-def read_serial_data(text_widget, stop_event):
     kml, linestring = create_kml()
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
-    try: #try and except to print an error int the text widget if something's wrong with the serial reader
-        ser = serial.Serial(port, baud_rate, timeout=1)
-        with ser, open(csv_file, 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(csv_headers)
 
-            # Initialize variables that store the values of the sensor & gps dta.
-            time_value = None
-            temperature_value = None
-            pressure_value = None
-            altitude_value = None
-            latitude_value = None
-            longitude_value = None
-
-            while not stop_event.is_set():
-                if ser.in_waiting > 0:
-                    data_line = ser.readline().decode('utf-8').rstrip()
-                    add_data_to_text_widget(text_widget, data_line)
 
                 sensor_type, sensor_value = parse_data(data_line)
-                    #Assign the sensor values
+                # Assign the sensor values based on sensor_type
                 if sensor_type == "Time":
-                        time_value = sensor_value
+                    time_value = sensor_value
                 elif sensor_type == "Temperature":
-                        temperature_value = sensor_value
+                    temperature_value = sensor_value
                 elif sensor_type == "Pressure":
-                        pressure_value = sensor_value
+                    pressure_value = sensor_value
                 elif sensor_type == "Altitude":
-                        altitude_value = sensor_value
+                    altitude_value = sensor_value
                 elif sensor_type == "Latitude":
-                        latitude_value = sensor_value
+                    latitude_value = sensor_value
                 elif sensor_type == "Longitude":
-                        longitude_value = sensor_value
 
-                # Make sure these values aren't none/null so that it doesn't fuck up anything
-                if time_value is not None and temperature_value is not None and pressure_value is not None and altitude_value is not None and latitude_value is not None and longitude_value is not None:
-                    altitude_value_float = float(altitude_value)
-                    new_coords = (float(longitude_value), float(latitude_value), altitude_value_float)
-                    coordinates.append(new_coords)  # Altitude is 0
-
-                    # Update KML
+                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value]):
+                    new_coords = (float(longitude_value), float(latitude_value), float(altitude_value))
+                    coordinates.append(new_coords)
                     update_kml(kml, linestring, coordinates, new_coords)
-                        
-                    # Open CSV, append data, close CSV
-                    with open(csv_file, 'a', newline='') as file:
-                        writer = csv.writer(file)
-                        writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value])
-                        
-                    # Print data
-                    print("Data processed and saved")
 
-                    # Update backup files
-                    update_backup_files(backup_csv_file, backup_kml_file)
-
-                    # Print the amazing values
-                    print("-----------------------")
-                    print(f"Time: {time_value}, Temperature: {temperature_value}, Pressure: {pressure_value}, Altitude: {altitude_value}") #Print seperate lines so its more clear in the console aswell ig
-                    print(f"Time: {time_value}, Latitude: {latitude_value}, Longitude: {longitude_value}")
-                    print("-----------------------")
-                    
                     # Reset the values after writing to the CSV
-                    time_value = None
-                    temperature_value = None
-                    pressure_value = None
-                    altitude_value = None
-                    latitude_value = None
-                    longitude_value = None
+                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = None
 
-                    # Update the backup files
-                    update_backup_files(backup_csv_file, backup_kml_file)
 
+
+# Function to handle stop reading
+def stop_reading(stop_event):
+    stop_event.set()  # Signal the thread to stop
+
+
+# Function to handle start reading
+def start_reading(text_widget, stop_event):
+    try:
+        ser = serial.Serial(port, baud_rate, timeout=1)
+        stop_event.clear()
+        threading.Thread(target=read_serial_data, args=(text_widget, stop_event, ser), daemon=True).start()
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}")
     except Exception as e:
         add_data_to_text_widget(text_widget, f"Error: {e}")
 
-
-# function to reset the csv file with the button
-def reset_csv():
-    global csv_file, csv_headers
-    if os.path.exists(csv_file):
-        os.remove(csv_file)
-    with open(csv_file, 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(csv_headers)
+# Function to reset CSV
+def reset_csv(text_widget):
+    try:
+        if os.path.exists(csv_file):
+            os.remove(csv_file)
+        with open(csv_file, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(csv_headers)
+        add_data_to_text_widget(text_widget, "CSV file has been reset.\n")
+    except Exception as e:
+        add_data_to_text_widget(text_widget, f"Error resetting CSV file: {e}\n")
 
 # Tkinter UI setup
 def setup_ui():
     root = tk.Tk()
     root.title("Vila2Sat Serial GUI")
-
-    # Open in full-screen mode
-    if os.name == 'nt':  # For Windows
-        root.state('zoomed')
-    else:  # For MacOS and Linux
-        root.attributes('-fullscreen', True)
+    root.state('zoomed')
 
     # Top frame for buttons
     top_frame = tk.Frame(root)
@@ -229,15 +190,16 @@ def setup_ui():
     # Event object to control the reading thread
     stop_event = threading.Event()
 
-    # Start and Stop buttons
-    start_button = tk.Button(center_frame, text="Start Reading", command=lambda: threading.Thread(target=read_serial_data, args=(text_widget, stop_event), daemon=True).start())
+    # Start button
+    start_button = tk.Button(top_frame, text="Start Reading", command=lambda: start_reading(text_widget, stop_event))
     start_button.pack(side=tk.LEFT, padx=5)
 
-    stop_button = tk.Button(center_frame, text="Stop Reading", command=lambda: stop_event.set())
+    # Stop button
+    stop_button = tk.Button(top_frame, text="Stop Reading", command=lambda: stop_reading(stop_event))
     stop_button.pack(side=tk.LEFT, padx=5)
 
-    # Reset button aligned to the right
-    reset_button = tk.Button(top_frame, text="Reset CSV", command=reset_csv, bg='red', fg='white')
+    # Reset button aligned to the right and colored red
+    reset_button = tk.Button(top_frame, text="Reset CSV", command=lambda: reset_csv(text_widget), bg='red', fg='white')
     reset_button.pack(side=tk.RIGHT, padx=10)
 
     root.mainloop()

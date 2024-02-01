@@ -8,7 +8,7 @@ import tkinter as tk
 import threading
 
 # Serial port configuration
-port = "COM3"  # Change this to your Arduino's serial port
+port = "COM4"  # Change this to your Arduino's serial port
 baud_rate = 9600
 
 # Create the KML File with certain settings
@@ -99,6 +99,12 @@ def add_data_to_text_widget(text_widget, data):
     text_widget.see(tk.END)  # Scroll to the bottom
     text_widget.config(state=tk.DISABLED)  # Disable the widget again
 
+def add_line_text_widget(text_widget):
+    text_widget.config(state=tk.NORMAL)  # Temporarily enable the widget to modify it
+    text_widget.insert(tk.END, '---------------\n')  # Add line
+    text_widget.see(tk.END)  # Scroll to the bottom
+    text_widget.config(state=tk.DISABLED)  # Disable the widget again
+
 # CSV file configuration
 csv_file = "output.csv"
 csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude"]
@@ -120,6 +126,7 @@ def read_serial_data(text_widget, stop_event, ser):
         while not stop_event.is_set():
             if ser.in_waiting > 0:
                 data_line = ser.readline().decode('utf-8').rstrip()
+                #print("Received data:", data_line)  # Debug print
                 add_data_to_text_widget(text_widget, data_line)
 
                 sensor_type, sensor_value = parse_data(data_line)
@@ -140,23 +147,29 @@ def read_serial_data(text_widget, stop_event, ser):
                 if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value]):
                     new_coords = (float(longitude_value), float(latitude_value), float(altitude_value))
                     coordinates.append(new_coords)
+                    #print("Updating KML...") #Debug
                     update_kml(kml, linestring, coordinates, new_coords)
 
+                    # Append data to CSV file
+                    #print("Appending to CSV...") #Debug
                     with open(csv_file, 'a', newline='') as f:
                         csv_writer = csv.writer(f)
                         csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value])
 
+                    #print("Updating backup files...") #Debug
                     update_backup_files(backup_csv_file, backup_kml_file)
 
                     # Reset the values after writing to the CSV
                     time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = None
-
+                    add_line_text_widget(text_widget)
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}\n")
     except Exception as e:
         add_data_to_text_widget(text_widget, f"Error: {e}\n")
+        print("Error:", e)  # Debug print
     finally:
-        ser.close()  # Close the serial port when done
+        if ser.is_open:
+            ser.close()  # Close the serial port when done
 
 
 
@@ -168,6 +181,18 @@ def stop_reading(stop_event):
 # Function to handle start reading
 def start_reading(text_widget, stop_event):
     try:
+        # Create CSV file with headers if it doesn't exist
+        if not os.path.exists(csv_file):
+            with open(csv_file, 'w', newline='') as f:
+                csv_writer = csv.writer(f)
+                csv_writer.writerow(csv_headers)
+
+        # Create an initial KML file if it doesn't exist
+        if not os.path.exists("live_track.kml"):
+            kml, _ = create_kml()
+            kml.save("live_track.kml")
+
+        # Initialize the serial port
         ser = serial.Serial(port, baud_rate, timeout=1)
         stop_event.clear()
         threading.Thread(target=read_serial_data, args=(text_widget, stop_event, ser), daemon=True).start()

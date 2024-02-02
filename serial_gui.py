@@ -91,6 +91,12 @@ def parse_data(data_line):
         return "Latitude", data_line.split("Latitude=")[-1].strip()
     elif "Longitude=" in data_line:
         return "Longitude", data_line.split("Longitude=")[-1].strip()
+    elif "gyro_x=" in data_line:
+        return "Longitude", data_line.split("gyro_x=")[-1].strip()
+    elif "gyro_y=" in data_line:
+        return "Longitude", data_line.split("gyro_y=")[-1].strip()
+    elif "gyro_z=" in data_line:
+        return "Longitude", data_line.split("gyro_z=")[-1].strip()
     return None, None
 
 def add_data_to_text_widget(text_widget, data):
@@ -107,7 +113,7 @@ def add_line_text_widget(text_widget):
 
 # CSV file configuration
 csv_file = "output.csv"
-csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude"]
+csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gyro_x", "gyro_y", "gyro_z"]
 
 def read_serial_data(text_widget, stop_event, ser):
     kml, linestring = create_kml()
@@ -121,6 +127,9 @@ def read_serial_data(text_widget, stop_event, ser):
     altitude_value = None
     latitude_value = None
     longitude_value = None
+    gyro_x_value = None
+    gyro_y_value = None
+    gyro_z_value = None
 
     try:
         while not stop_event.is_set():
@@ -143,8 +152,14 @@ def read_serial_data(text_widget, stop_event, ser):
                     latitude_value = sensor_value
                 elif sensor_type == "Longitude":
                     longitude_value = sensor_value
+                elif sensor_type == "gyro_x":
+                    gyro_x_value = sensor_value
+                elif sensor_type == "gyro_y":
+                    gyro_y_value = sensor_value
+                elif sensor_type == "gyro_z":
+                    gyro_z_value = sensor_value
 
-                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value]):
+                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gyro_x_value, gyro_y_value, gyro_z_value]):
                     new_coords = (float(longitude_value), float(latitude_value), float(altitude_value))
                     coordinates.append(new_coords)
                     #print("Updating KML...") #Debug
@@ -154,13 +169,13 @@ def read_serial_data(text_widget, stop_event, ser):
                     #print("Appending to CSV...") #Debug
                     with open(csv_file, 'a', newline='') as f:
                         csv_writer = csv.writer(f)
-                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value])
+                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gyro_x_value, gyro_y_value, gyro_z_value])
 
                     #print("Updating backup files...") #Debug
                     update_backup_files(backup_csv_file, backup_kml_file)
 
                     # Reset the values after writing to the CSV
-                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = None
+                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gyro_x_value = gyro_y_value = gyro_z_value = None
                     add_line_text_widget(text_widget)
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}\n")

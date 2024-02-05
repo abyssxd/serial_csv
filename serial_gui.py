@@ -92,11 +92,11 @@ def parse_data(data_line):
     elif "Longitude=" in data_line:
         return "Longitude", data_line.split("Longitude=")[-1].strip()
     elif "gyro_x=" in data_line:
-        return "Longitude", data_line.split("gyro_x=")[-1].strip()
+        return "gyro_x", data_line.split("gyro_x=")[-1].strip()
     elif "gyro_y=" in data_line:
-        return "Longitude", data_line.split("gyro_y=")[-1].strip()
+        return "gyro_y", data_line.split("gyro_y=")[-1].strip()
     elif "gyro_z=" in data_line:
-        return "Longitude", data_line.split("gyro_z=")[-1].strip()
+        return "gyro_z", data_line.split("gyro_z=")[-1].strip()
     return None, None
 
 def add_data_to_text_widget(text_widget, data):

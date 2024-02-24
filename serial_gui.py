@@ -75,7 +75,7 @@ def create_backup_files(csv_file, kml_file):
     return backup_csv_file, backup_kml_file
 
 def update_backup_files(backup_csv_file, backup_kml_file):
-    shutil.copy("output.csv", backup_csv_file)
+    shutil.copy("sheet.csv", backup_csv_file)
     shutil.copy("live_track.kml", backup_kml_file)
 
 def parse_data(data_line):
@@ -91,16 +91,30 @@ def parse_data(data_line):
         return "Latitude", data_line.split("Latitude=")[-1].strip()
     elif "Longitude=" in data_line:
         return "Longitude", data_line.split("Longitude=")[-1].strip()
+    elif "gps_sats=" in data_line:
+        return "gps_sats", data_line.split("gps_sats=")[-1].strip()
+    elif "gps_sats=" in data_line:
+        return "gps_sats", data_line.split("gps_sats=")[-1].strip()
+    elif "gps_altitude=" in data_line:
+        return "gps_altitude", data_line.split("gps_altitude=")[-1].strip()
     elif "gyro_x=" in data_line:
         return "gyro_x", data_line.split("gyro_x=")[-1].strip()
     elif "gyro_y=" in data_line:
         return "gyro_y", data_line.split("gyro_y=")[-1].strip()
     elif "gyro_z=" in data_line:
         return "gyro_z", data_line.split("gyro_z=")[-1].strip()
+    elif "gyro_acc_x=" in data_line:
+        return "gyro_acc_x", data_line.split("gyro_acc_x=")[-1].strip()
+    elif "gyro_acc_y=" in data_line:
+        return "gyro_acc_y", data_line.split("gyro_acc_y=")[-1].strip()
+    elif "gyro_acc_z=" in data_line:
+        return "gyro_acc_z", data_line.split("gyro_acc_z=")[-1].strip()
+    elif "gyro_temp=" in data_line:
+        return "gyro_temp", data_line.split("gyro_temp=")[-1].strip()
     elif "bmp_status=" in data_line:
         return "bmp_status", data_line.split("bmp_status=")[-1].strip()
-    elif "gps_status‎=" in data_line:
-        return "gps_status‎", data_line.split("gps_status‎=")[-1].strip()
+    elif "gps_status=" in data_line:
+        return "gps_status", data_line.split("gps_status=")[-1].strip()
     elif "gyro_status=" in data_line:
         return "gyro_status", data_line.split("gyro_status=")[-1].strip()
     elif "apc_status=" in data_line:
@@ -120,8 +134,8 @@ def add_line_text_widget(text_widget):
     text_widget.config(state=tk.DISABLED)  # Disable the widget again
 
 # CSV file configuration
-csv_file = "output.csv"
-csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status"]
+csv_file = "sheet.csv"
+csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "gyro_acc_x", "gyro_acc_y", "gyro_acc_z", "gyro_temp", "bmp_status", "gps_status", "gyro_status", "apc_status"]
 
 def read_serial_data(text_widget, stop_event, ser):
     kml, linestring = create_kml()
@@ -129,7 +143,7 @@ def read_serial_data(text_widget, stop_event, ser):
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
     # Initialize sensor values
-    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gyro_x_value = gyro_y_value = gyro_z_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = None
+    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = gyro_acc_x_value = gyro_acc_y_value = gyro_acc_z_value = gyro_temp_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = None
 
     try:
         while not stop_event.is_set():
@@ -152,12 +166,24 @@ def read_serial_data(text_widget, stop_event, ser):
                     latitude_value = sensor_value
                 elif sensor_type == "Longitude":
                     longitude_value = sensor_value
+                elif sensor_type == "gps_altitude":
+                    gps_altitude = sensor_value
+                elif sensor_type == "gps_sats":
+                    gps_sats = sensor_value
                 elif sensor_type == "gyro_x":
                     gyro_x_value = sensor_value
                 elif sensor_type == "gyro_y":
                     gyro_y_value = sensor_value
                 elif sensor_type == "gyro_z":
                     gyro_z_value = sensor_value
+                elif sensor_type == "gyro_acc_x":
+                    gyro_acc_x_value = sensor_value
+                elif sensor_type == "gyro_acc_y":
+                    gyro_acc_y_value = sensor_value
+                elif sensor_type == "gyro_acc_z":
+                    gyro_acc_z_value = sensor_value
+                elif sensor_type == "gyro_temp":
+                    gyro_temp_value = sensor_value
                 elif sensor_type == "bmp_status":
                     bmp_status_value = sensor_value
                 elif sensor_type == "gps_status":
@@ -167,7 +193,7 @@ def read_serial_data(text_widget, stop_event, ser):
                 elif sensor_type == "apc_status":
                     apc_status_value = sensor_value
 
-                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value]):
+                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, gyro_acc_x_value, gyro_acc_y_value, gyro_acc_z_value, gyro_temp_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value]):
                     new_coords = (float(longitude_value), float(latitude_value), float(altitude_value))
                     coordinates.append(new_coords)
                     #print("Updating KML...") #Debug
@@ -177,13 +203,14 @@ def read_serial_data(text_widget, stop_event, ser):
                     #print("Appending to CSV...") #Debug
                     with open(csv_file, 'a', newline='') as f:
                         csv_writer = csv.writer(f)
-                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gyro_x_value, gyro_y_value, gyro_z_value,  bmp_status_value, gps_status_value, gyro_status_value, apc_status_value])
+                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, gyro_acc_x_value, gyro_acc_y_value, gyro_acc_z_value, gyro_temp_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value])
 
                     #print("Updating backup files...") #Debug
                     update_backup_files(backup_csv_file, backup_kml_file)
 
                     # Reset the values after writing to the CSV
-                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gyro_x_value = gyro_y_value = gyro_z_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = None
+                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = gyro_acc_x_value = gyro_acc_y_value = gyro_acc_z_value = gyro_temp_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = None
+
                     add_line_text_widget(text_widget)
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}\n")

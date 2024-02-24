@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+    <Document id="1">
+        <Style id="4">
+            <LineStyle id="5">
+                <color>ff0000ff</color>
+                <colorMode>normal</colorMode>
+                <width>4</width>
+            </LineStyle>
+        </Style>
+        <LookAt>
+            <longitude>2.154902</longitude>
+            <latitude>41.382736</latitude>
+            <altitude>50.0</altitude>
+            <heading>0</heading>
+            <tilt>45</tilt>
+            <altitudeMode>absolute</altitudeMode>
+            <range>20</range>
+        </LookAt>
+        <Placemark id="3">
+            <name>Vila2Sat_Track</name>
+            <styleUrl>#4</styleUrl>
+            <LineString id="2">
+                <extrude>0</extrude>
+                <tessellate>0</tessellate>
+                <altitudeMode>absolute</altitudeMode>
+                <coordinates>2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0 2.154902,41.382736,40.0</coordinates>
+            </LineString>
+        </Placemark>
+    </Document>
+</kml>

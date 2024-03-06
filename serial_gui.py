@@ -6,10 +6,44 @@ import os
 from datetime import datetime
 import tkinter as tk
 import threading
+import mysql.connector
+from mysql.connector import Error
 
 # Serial port configuration
 port = "COM4"  # Change this to your Arduino's serial port
 baud_rate = 9600
+
+# MySQL database configuration
+mysql_config = {
+    'host': 'localhost',
+    'database': 'pogmc_cansat',
+    'user': 'pogmc_cansat',
+    'password': 'fakePassword12'
+}
+
+# Function to connect to MySQL database
+def connect_to_mysql():
+    try:
+        connection = mysql.connector.connect(**mysql_config)
+        if connection.is_connected():
+            print("Connected to MySQL database")
+            return connection
+    except Error as e:
+        print(f"Error connecting to MySQL database: {e}")
+        return None
+
+# Function to insert data into MySQL database
+def insert_data_to_mysql(connection, data):
+    try:
+        cursor = connection.cursor()
+        insert_query = "INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, gyro_acc_z, gyro_temp, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        cursor.execute(insert_query, data)
+        connection.commit()
+        cursor.close()
+        print("Data inserted into MySQL database")
+    except Error as e:
+        print(f"Error inserting data into MySQL database: {e}")
+
 
 # Create the KML File with certain settings
 def create_kml():
@@ -148,6 +182,9 @@ def read_serial_data(text_widget, stop_event, ser):
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
+    #Connect to mysql database
+    mysql_connection = connect_to_mysql()
+
     # Initialize sensor values
     time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = gyro_acc_x_value = gyro_acc_y_value = gyro_acc_z_value = gyro_temp_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
 
@@ -211,6 +248,12 @@ def read_serial_data(text_widget, stop_event, ser):
                     #print("Updating KML...") #Debug
                     update_kml(kml, linestring, coordinates, new_coords)
 
+
+                # Insert data into MySQL database
+                data_for_mysql = (time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, gyro_acc_x_value, gyro_acc_y_value, gyro_acc_z_value, gyro_temp_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value)
+                if mysql_connection:
+                    insert_data_to_mysql(mysql_connection, data_for_mysql)
+
                     # Append data to CSV file
                     #print("Appending to CSV...") #Debug
                     with open(csv_file, 'a', newline='') as f:
@@ -233,7 +276,8 @@ def read_serial_data(text_widget, stop_event, ser):
     finally:
         if ser.is_open:
             ser.close()  # Close the serial port when done
-
+        if mysql_connection:
+            mysql_connection.close()
 
 
 # Function to handle stop reading

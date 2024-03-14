@@ -8,6 +8,7 @@ import tkinter as tk
 import threading
 import mysql.connector
 from mysql.connector import Error
+import time
 
 # Serial port configuration
 port = "COM4"  # Change this to your Arduino's serial port
@@ -21,12 +22,59 @@ mysql_config = {
     'password': 'fakePassword12'
 }
 
+def rename_old_table_and_create_new(connection):
+    cursor = connection.cursor()
+    epoch_time = str(int(time.time()))
+    new_table_name = "sensor_data_" + epoch_time
+    
+    # Check if the old table exists and rename it
+    cursor.execute("SHOW TABLES LIKE 'sensor_data'")
+    result = cursor.fetchone()
+    if result:
+        rename_query = f"RENAME TABLE sensor_data TO {new_table_name}"
+        cursor.execute(rename_query)
+        print(f"Old table renamed to {new_table_name}")
+    
+    # Create a new sensor_data table with the necessary schema
+    create_table_query = """
+    CREATE TABLE sensor_data (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        Time VARCHAR(255),
+        Temperature DOUBLE,
+        Pressure DOUBLE,
+        Altitude DOUBLE,
+        Latitude DOUBLE,
+        Longitude DOUBLE,
+        gps_altitude DOUBLE,
+        gps_sats INT,
+        gyro_x DOUBLE,
+        gyro_y DOUBLE,
+        gyro_z DOUBLE,
+        gyro_acc_x DOUBLE,
+        gyro_acc_y DOUBLE,
+        gyro_acc_z DOUBLE,
+        gyro_temp DOUBLE,
+        bmp_status INT,
+        gps_status INT,
+        gyro_status INT,
+        apc_status INT,
+        servo_status INT,
+        servo_rotation DOUBLE,
+        sd_status INT
+    )
+    """
+    cursor.execute(create_table_query)
+    print("New sensor_data table created.")
+
+    cursor.close()
+
 # Function to connect to MySQL database
 def connect_to_mysql():
     try:
         connection = mysql.connector.connect(**mysql_config)
         if connection.is_connected():
             print("Connected to MySQL database")
+            rename_old_table_and_create_new(connection)
             return connection
     except Error as e:
         print(f"Error connecting to MySQL database: {e}")
@@ -43,7 +91,6 @@ def insert_data_to_mysql(connection, data):
         print("Data inserted into MySQL database")
     except Error as e:
         print(f"Error inserting data into MySQL database: {e}")
-
 
 # Create the KML File with certain settings
 def create_kml():

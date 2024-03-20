@@ -82,15 +82,23 @@ def connect_to_mysql():
 
 # Function to insert data into MySQL database
 def insert_data_to_mysql(connection, data):
+    # Check for null values and report which ones are missing
+    missing_values = [column for column, value in zip(csv_headers, data) if value is None]
+    if missing_values:
+        print("Cannot insert data due to missing values in columns:", ", ".join(missing_values))
+        return 
     try:
         cursor = connection.cursor()
-        insert_query = "INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, gyro_acc_z, gyro_temp, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        # Make sure the number of placeholders matches the number of data points
+        insert_query = "INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, gyro_acc_x, gyro_acc_y, gyro_acc_z, gyro_temp, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         cursor.execute(insert_query, data)
         connection.commit()
-        cursor.close()
         print("Data inserted into MySQL database")
     except Error as e:
         print(f"Error inserting data into MySQL database: {e}")
+    finally:
+        if cursor:
+            cursor.close()
 
 # Create the KML File with certain settings
 def create_kml():

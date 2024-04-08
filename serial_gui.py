@@ -16,11 +16,11 @@ baud_rate = 9600
 
 # MySQL database configuration
 mysql_config = {
-    'host': 'localhost,
+    'host': 'fakeip',
     'port': 3306,
     'database': 'fakedb',
     'user': 'fakeuser',
-    'password': 'fakepassword'
+    'password': 'fakepass@#'
 }
 
 

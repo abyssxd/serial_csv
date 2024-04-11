@@ -52,7 +52,6 @@ def rename_old_table_and_create_new(connection):
         gyro_x DOUBLE,
         gyro_y DOUBLE,
         gyro_z DOUBLE,
-        gyro_temp DOUBLE,
         bmp_status INT,
         gps_status INT,
         gyro_status INT,
@@ -90,7 +89,7 @@ def insert_data_to_mysql(connection, data):
     try:
         cursor = connection.cursor()
         # Make sure the number of placeholders matches the number of data points
-        insert_query = "INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, gyro_temp, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        insert_query = "INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         cursor.execute(insert_query, data)
         connection.commit()
         print("Data inserted into MySQL database")
@@ -192,8 +191,6 @@ def parse_data(data_line):
         return "gyro_y", data_line.split("gyro_y=")[-1].strip()
     elif "gyro_z=" in data_line:
         return "gyro_z", data_line.split("gyro_z=")[-1].strip()
-    elif "gyro_temp=" in data_line:
-        return "gyro_temp", data_line.split("gyro_temp=")[-1].strip()
     elif "bmp_status=" in data_line:
         return "bmp_status", data_line.split("bmp_status=")[-1].strip()
     elif "gps_status=" in data_line:
@@ -224,7 +221,7 @@ def add_line_text_widget(text_widget):
 
 # CSV file configuration
 csv_file = "sheet.csv"
-csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "gyro_temp", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status"]
+csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status"]
 
 def read_serial_data(text_widget, stop_event, ser):
     kml, linestring = create_kml()
@@ -235,7 +232,7 @@ def read_serial_data(text_widget, stop_event, ser):
     mysql_connection = connect_to_mysql()
 
     # Initialize sensor values
-    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value  = gyro_temp_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
+    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
 
     try:
         while not stop_event.is_set():
@@ -268,8 +265,6 @@ def read_serial_data(text_widget, stop_event, ser):
                     gyro_y_value = sensor_value
                 elif sensor_type == "gyro_z":
                     gyro_z_value = sensor_value
-                elif sensor_type == "gyro_temp":
-                    gyro_temp_value = sensor_value
                 elif sensor_type == "bmp_status":
                     bmp_status_value = sensor_value
                 elif sensor_type == "gps_status":
@@ -285,7 +280,7 @@ def read_serial_data(text_widget, stop_event, ser):
                 elif sensor_type == "sd_status":
                     sd_status_value = sensor_value
 
-                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, gyro_temp_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value]):
+                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value]):
                     new_coords = (float(longitude_value), float(latitude_value), float(altitude_value))
                     coordinates.append(new_coords)
                     #print("Updating KML...") #Debug
@@ -295,18 +290,18 @@ def read_serial_data(text_widget, stop_event, ser):
                     #print("Appending to CSV...") #Debug
                     with open(csv_file, 'a', newline='') as f:
                         csv_writer = csv.writer(f)
-                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, gyro_temp_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value])
+                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value])
 
                     #print("Updating backup files...") #Debug
                     update_backup_files(backup_csv_file, backup_kml_file)
 
                     # Insert data into MySQL database
-                    data_for_mysql = (time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, gyro_temp_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value)
+                    data_for_mysql = (time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value)
                     if mysql_connection:
                         insert_data_to_mysql(mysql_connection, data_for_mysql)
 
                     # Reset the values after writing to the CSV
-                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = gyro_temp_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
+                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
 
 
                     add_line_text_widget(text_widget)

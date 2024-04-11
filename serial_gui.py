@@ -216,12 +216,12 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
         
         with open(csv_file, 'a', newline='') as f:
             csv_writer = csv.writer(f)
-            csv_writer.writerow([sensor_values[header] for header in csv_headers])
+            csv_writer.writerow([sensor_values.get(header, 'N/A') for header in csv_headers])  # Use 'N/A' for missing data
 
         update_backup_files(backup_csv_file, backup_kml_file)
 
         # Enqueue data for MySQL insertion
-        data_for_mysql = tuple(sensor_values[header] for header in csv_headers)
+        data_for_mysql = tuple(sensor_values.get(header, 'N/A') for header in csv_headers)
         mysql_queue.put(data_for_mysql)
 
     try:

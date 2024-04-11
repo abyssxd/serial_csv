@@ -5,14 +5,19 @@ import shutil
 import os
 from datetime import datetime
 import tkinter as tk
-import threading
 import mysql.connector
 from mysql.connector import Error
+from mysql.connector import pooling
 import time
+import queue
+import threading
 
 # Serial port configuration
 port = "COM7"  # Change this to your Arduino's serial port
 baud_rate = 9600
+
+# Initialize a queue for MySQL operations
+mysql_queue = queue.Queue()
 
 # MySQL database configuration
 mysql_config = {
@@ -66,38 +71,45 @@ def rename_old_table_and_create_new(connection):
 
     cursor.close()
 
-# Function to connect to MySQL database
-def connect_to_mysql():
-    try:
-        connection = mysql.connector.connect(**mysql_config)
-        if connection.is_connected():
-            print("Connected to MySQL database")
-            rename_old_table_and_create_new(connection)
-            return connection
-    except Error as e:
-        print(f"Error connecting to MySQL database: {e}")
-        return None
+def create_mysql_connection_pool(pool_name="mysql_pool", pool_size=5):
+    pool = pooling.MySQLConnectionPool(pool_name=pool_name,
+                                       pool_size=pool_size,
+                                       pool_reset_session=True,
+                                       **mysql_config)
+    return pool
 
+mysql_pool = create_mysql_connection_pool(pool_name="cansat_pool", pool_size=10)
 
-# Function to insert data into MySQL database
-def insert_data_to_mysql(connection, data):
-    # Check for null values and report which ones are missing
-    missing_values = [column for column, value in zip(csv_headers, data) if value is None]
-    if missing_values:
-        print("Cannot insert data due to missing values in columns:", ", ".join(missing_values))
-        return 
-    try:
-        cursor = connection.cursor()
-        # Make sure the number of placeholders matches the number of data points
-        insert_query = "INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        cursor.execute(insert_query, data)
-        connection.commit()
-        print("Data inserted into MySQL database")
-    except Error as e:
-        print(f"Error inserting data into MySQL database: {e}")
-    finally:
-        if cursor:
-            cursor.close()
+def insert_data_to_mysql():
+    while True:
+        data = mysql_queue.get()
+        if data is None:
+            break  # Exit loop if None is received
+
+        connection = None
+        try:
+            connection = mysql_pool.get_connection()
+            cursor = connection.cursor()
+            insert_query = """
+            INSERT INTO sensor_data
+            (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_query, data)
+            connection.commit()
+        except Error as e:
+            print(f"Error inserting data into MySQL database: {e}")
+        finally:
+            mysql_queue.task_done()
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()  # Return the connection back to the pool
+
+# Start the MySQL insertion thread
+mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)
+mysql_insertion_thread.start()
+
 
 # Create the KML File with certain settings
 def create_kml():
@@ -167,45 +179,12 @@ def update_backup_files(backup_csv_file, backup_kml_file):
     shutil.copy("live_track.kml", backup_kml_file)
 
 def parse_data(data_line):
-    if "Time=" in data_line:
-        return "Time", data_line.split("Time=")[-1].strip()
-    elif "Temperature=" in data_line:
-        return "Temperature", data_line.split("Temperature=")[-1].strip()
-    elif "Pressure=" in data_line:
-        return "Pressure", data_line.split("Pressure=")[-1].strip()
-    elif "Altitude=" in data_line:
-        return "Altitude", data_line.split("Altitude=")[-1].strip()
-    elif "Latitude=" in data_line:
-        return "Latitude", data_line.split("Latitude=")[-1].strip()
-    elif "Longitude=" in data_line:
-        return "Longitude", data_line.split("Longitude=")[-1].strip()
-    elif "gps_sats=" in data_line:
-        return "gps_sats", data_line.split("gps_sats=")[-1].strip()
-    elif "gps_sats=" in data_line:
-        return "gps_sats", data_line.split("gps_sats=")[-1].strip()
-    elif "gps_altitude=" in data_line:
-        return "gps_altitude", data_line.split("gps_altitude=")[-1].strip()
-    elif "gyro_x=" in data_line:
-        return "gyro_x", data_line.split("gyro_x=")[-1].strip()
-    elif "gyro_y=" in data_line:
-        return "gyro_y", data_line.split("gyro_y=")[-1].strip()
-    elif "gyro_z=" in data_line:
-        return "gyro_z", data_line.split("gyro_z=")[-1].strip()
-    elif "bmp_status=" in data_line:
-        return "bmp_status", data_line.split("bmp_status=")[-1].strip()
-    elif "gps_status=" in data_line:
-        return "gps_status", data_line.split("gps_status=")[-1].strip()
-    elif "gyro_status=" in data_line:
-        return "gyro_status", data_line.split("gyro_status=")[-1].strip()
-    elif "apc_status=" in data_line:
-        return "apc_status", data_line.split("apc_status=")[-1].strip()
-    elif "servo_status=" in data_line:
-        return "servo_status", data_line.split("servo_status=")[-1].strip()
-    elif "servo_rotation=" in data_line:
-        return "servo_rotation", data_line.split("servo_rotation=")[-1].strip()
-    elif "sd_status=" in data_line:
-        return "sd_status", data_line.split("sd_status=")[-1].strip()
-    return None, None
+    try:
+        sensor_type, sensor_value = data_line.split("=")
+        return sensor_type.strip(), sensor_value.strip()
+    except ValueError as e:
+        print(f"Error parsing data_line '{data_line}': {e}")
+        return None, None
 
 def add_data_to_text_widget(text_widget, data):
     text_widget.config(state=tk.NORMAL)  # Temporarily enable the widget to modify it
@@ -223,103 +202,59 @@ def add_line_text_widget(text_widget):
 csv_file = "sheet.csv"
 csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status"]
 
-def read_serial_data(text_widget, stop_event, ser):
+def read_serial_data(text_widget, stop_event, ser, csv_file):
+    sensor_values = {key: None for key in csv_headers}  # Initialize sensor values
     kml, linestring = create_kml()
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
-    #Connect to mysql database
-    mysql_connection = connect_to_mysql()
+    def process_and_insert_data(sensor_values):
+        # Process data here...
+        new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
+        coordinates.append(new_coords)
+        update_kml(kml, linestring, coordinates, new_coords)
+        
+        with open(csv_file, 'a', newline='') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow([sensor_values[header] for header in csv_headers])
 
-    # Initialize sensor values
-    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
+        update_backup_files(backup_csv_file, backup_kml_file)
+
+        # Enqueue data for MySQL insertion
+        data_for_mysql = tuple(sensor_values[header] for header in csv_headers)
+        mysql_queue.put(data_for_mysql)
 
     try:
         while not stop_event.is_set():
             if ser.in_waiting > 0:
                 data_line = ser.readline().decode('utf-8').rstrip()
-                #print("Received data:", data_line)  # Debug print
                 add_data_to_text_widget(text_widget, data_line)
-
+                
                 sensor_type, sensor_value = parse_data(data_line)
-                # Assign the sensor values based on sensor_type
-                if sensor_type == "Time":
-                    time_value = sensor_value
-                elif sensor_type == "Temperature":
-                    temperature_value = sensor_value
-                elif sensor_type == "Pressure":
-                    pressure_value = sensor_value
-                elif sensor_type == "Altitude":
-                    altitude_value = sensor_value
-                elif sensor_type == "Latitude":
-                    latitude_value = sensor_value
-                elif sensor_type == "Longitude":
-                    longitude_value = sensor_value
-                elif sensor_type == "gps_altitude":
-                    gps_altitude = sensor_value
-                elif sensor_type == "gps_sats":
-                    gps_sats = sensor_value
-                elif sensor_type == "gyro_x":
-                    gyro_x_value = sensor_value
-                elif sensor_type == "gyro_y":
-                    gyro_y_value = sensor_value
-                elif sensor_type == "gyro_z":
-                    gyro_z_value = sensor_value
-                elif sensor_type == "bmp_status":
-                    bmp_status_value = sensor_value
-                elif sensor_type == "gps_status":
-                    gps_status_value = sensor_value
-                elif sensor_type == "gyro_status":
-                    gyro_status_value = sensor_value
-                elif sensor_type == "apc_status":
-                    apc_status_value = sensor_value
-                elif sensor_type == "servo_status":
-                    servo_status_value = sensor_value
-                elif sensor_type == "servo_rotation":
-                    servo_rotation_value = sensor_value
-                elif sensor_type == "sd_status":
-                    sd_status_value = sensor_value
-
-                if all(v is not None for v in [time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value]):
-                    new_coords = (float(longitude_value), float(latitude_value), float(altitude_value))
-                    coordinates.append(new_coords)
-                    #print("Updating KML...") #Debug
-                    update_kml(kml, linestring, coordinates, new_coords)
-
-                    # Append data to CSV file
-                    #print("Appending to CSV...") #Debug
-                    with open(csv_file, 'a', newline='') as f:
-                        csv_writer = csv.writer(f)
-                        csv_writer.writerow([time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value])
-
-                    #print("Updating backup files...") #Debug
-                    update_backup_files(backup_csv_file, backup_kml_file)
-
-                    # Insert data into MySQL database
-                    data_for_mysql = (time_value, temperature_value, pressure_value, altitude_value, latitude_value, longitude_value, gps_altitude, gps_sats, gyro_x_value, gyro_y_value, gyro_z_value, bmp_status_value, gps_status_value, gyro_status_value, apc_status_value, servo_status_value, servo_rotation_value, sd_status_value)
-                    if mysql_connection:
-                        insert_data_to_mysql(mysql_connection, data_for_mysql)
-
-                    # Reset the values after writing to the CSV
-                    time_value = temperature_value = pressure_value = altitude_value = latitude_value = longitude_value = gps_altitude = gps_sats = gyro_x_value = gyro_y_value = gyro_z_value = bmp_status_value = gps_status_value = gyro_status_value = apc_status_value = servo_status_value = servo_rotation_value = sd_status_value = None
-
-
-                    add_line_text_widget(text_widget)
+                if sensor_type in sensor_values:
+                    sensor_values[sensor_type] = sensor_value
+                    if all(value is not None for value in sensor_values.values()):
+                        process_and_insert_data(sensor_values)
+                        sensor_values = {key: None for key in csv_headers}  # Reset after processing
+                else:
+                    add_data_to_text_widget(text_widget, "Received malformed or unrecognized data line.")
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}\n")
     except Exception as e:
         add_data_to_text_widget(text_widget, f"Error: {e}\n")
-        print("Error:", e)  # Debug print
     finally:
         if ser.is_open:
-            ser.close()  # Close the serial port when done
-        if mysql_connection:
-            mysql_connection.close()
-
+            ser.close()
 
 # Function to handle stop reading
 def stop_reading(stop_event):
     stop_event.set()  # Signal the thread to stop
+    stop_mysql_thread()
+    
+
+def stop_mysql_thread():
+    mysql_queue.put(None)  # Signal the thread to exit
+    mysql_insertion_thread.join()
 
 
 # Function to handle start reading
@@ -339,7 +274,7 @@ def start_reading(text_widget, stop_event):
         # Initialize the serial port
         ser = serial.Serial(port, baud_rate, timeout=1)
         stop_event.clear()
-        threading.Thread(target=read_serial_data, args=(text_widget, stop_event, ser), daemon=True).start()
+        threading.Thread(target=read_serial_data, args=(text_widget, stop_event, ser, csv_file), daemon=True).start()
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}")
     except Exception as e:

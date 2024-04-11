@@ -5,7 +5,6 @@ import shutil
 import os
 from datetime import datetime
 import tkinter as tk
-import threading
 import mysql.connector
 from mysql.connector import Error
 from mysql.connector import pooling
@@ -210,8 +209,7 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
     def process_and_insert_data(sensor_values):
-        # Insert logic to process and insert data into MySQL and update KML/CSV here
-        # For example, appending to CSV, updating KML, and inserting into MySQL
+        # Process data here...
         new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
         coordinates.append(new_coords)
         update_kml(kml, linestring, coordinates, new_coords)
@@ -222,9 +220,9 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
 
         update_backup_files(backup_csv_file, backup_kml_file)
 
-        if mysql_connection:
-            data_for_mysql = tuple(sensor_values[header] for header in csv_headers)
-            mysql_queue.put(data_for_mysql)
+        # Enqueue data for MySQL insertion
+        data_for_mysql = tuple(sensor_values[header] for header in csv_headers)
+        mysql_queue.put(data_for_mysql)
 
     try:
         while not stop_event.is_set():
@@ -247,7 +245,6 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
     finally:
         if ser.is_open:
             ser.close()
-
 
 # Function to handle stop reading
 def stop_reading(stop_event):

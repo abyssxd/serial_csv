@@ -109,10 +109,6 @@ def insert_data_to_mysql():
             if connection:
                 connection.close()  # Return the connection back to the pool
 
-# Start the MySQL insertion thread
-mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)
-mysql_insertion_thread.start()
-
 
 # Create the KML File with certain settings
 def create_kml():
@@ -183,8 +179,14 @@ def update_backup_files(backup_csv_file, backup_kml_file):
 
 def parse_data(data_line):
     try:
-        sensor_type, sensor_value = data_line.split("=")
-        return sensor_type.strip(), sensor_value.strip()
+        # Splitting the line at "=" and stripping extra spaces from key and value
+        parts = data_line.split("=")
+        if len(parts) == 2:
+            key = parts[0].strip()
+            value = parts[1].strip()
+            return key, value
+        else:
+            return None, None
     except ValueError as e:
         print(f"Error parsing data_line '{data_line}': {e}")
         return None, None
@@ -211,31 +213,31 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
-def process_and_insert_data(sensor_values):
-    try:
-        print("Processing data for CSV and KML...")
-        # Process data here...
-        new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
-        coordinates.append(new_coords)
-        print(f"New coordinates: {new_coords}")
-        update_kml(kml, linestring, coordinates, new_coords)
-        
-        print("Updating CSV file...")
-        with open(csv_file, 'a', newline='') as f:
-            csv_writer = csv.writer(f)
-            row = [sensor_values.get(header, 'N/A') for header in csv_headers]
-            print(f"CSV row: {row}")
-            csv_writer.writerow(row)
-
-        print("Updating backup files...")
-        update_backup_files(backup_csv_file, backup_kml_file)
-
-        # Enqueue data for MySQL insertion
-        data_for_mysql = tuple(sensor_values.get(header, 'N/A') for header in csv_headers)
-        mysql_queue.put(data_for_mysql)
-        print("Data enqueued for MySQL insertion.")
-    except Exception as e:
-        print(f"Error in process_and_insert_data: {e}")
+    def process_and_insert_data(sensor_values):
+        try:
+            print("Processing data for CSV and KML...")
+            # Process data here...
+            new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
+            coordinates.append(new_coords)
+            print(f"New coordinates: {new_coords}")
+            update_kml(kml, linestring, coordinates, new_coords)
+            
+            print("Updating CSV file...")
+            with open(csv_file, 'a', newline='') as f:
+                csv_writer = csv.writer(f)
+                row = [sensor_values.get(header, 'N/A') for header in csv_headers]
+                print(f"CSV row: {row}")
+                csv_writer.writerow(row)
+    
+            print("Updating backup files...")
+            update_backup_files(backup_csv_file, backup_kml_file)
+    
+            # Enqueue data for MySQL insertion
+            data_for_mysql = tuple(sensor_values.get(header, 'N/A') for header in csv_headers)
+            mysql_queue.put(data_for_mysql)
+            print("Data enqueued for MySQL insertion.")
+        except Exception as e:
+            print(f"Error in process_and_insert_data: {e}")
 
     try:
         while not stop_event.is_set():
@@ -263,6 +265,7 @@ def process_and_insert_data(sensor_values):
 def stop_reading(stop_event):
     stop_event.set()  # Signal the thread to stop
     stop_mysql_thread()
+    mysql_thread_started = False
     
 
 def stop_mysql_thread():
@@ -270,28 +273,54 @@ def stop_mysql_thread():
     mysql_insertion_thread.join()
 
 
+# Global variable to keep track of whether the MySQL insertion thread has been started
+mysql_thread_started = False
+
 # Function to handle start reading
 def start_reading(text_widget, stop_event):
+    global mysql_thread_started
+    print("Starting to read...")
+
     try:
+        # Start the MySQL insertion thread only if it hasn't been started already
+        if not mysql_thread_started:
+            print("Starting MySQL insertion thread...")
+            mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)
+            mysql_insertion_thread.start()
+            mysql_thread_started = True
+            print("MySQL insertion thread started.")
+
         # Create CSV file with headers if it doesn't exist
         if not os.path.exists(csv_file):
+            print("Creating CSV file...")
             with open(csv_file, 'w', newline='') as f:
                 csv_writer = csv.writer(f)
                 csv_writer.writerow(csv_headers)
+            print("CSV file created.")
 
         # Create an initial KML file if it doesn't exist
         if not os.path.exists("live_track.kml"):
+            print("Creating initial KML file...")
             kml, _ = create_kml()
             kml.save("live_track.kml")
+            print("KML file created.")
 
         # Initialize the serial port
+        print(f"Attempting to open serial port {port}...")
         ser = serial.Serial(port, baud_rate, timeout=1)
+        print(f"Serial port {ser.name} opened successfully.")
+
         stop_event.clear()
+
+        print("Starting serial data reading thread...")
         threading.Thread(target=read_serial_data, args=(text_widget, stop_event, ser, csv_file), daemon=True).start()
+        print("Serial data reading thread started.")
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}")
+        print(f"Serial error: {e}")
     except Exception as e:
         add_data_to_text_widget(text_widget, f"Error: {e}")
+        print(f"Error: {e}")
 
 # Function to reset CSV
 def reset_csv(text_widget):

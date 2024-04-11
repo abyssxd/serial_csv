@@ -13,7 +13,7 @@ import queue
 import threading
 
 # Serial port configuration
-port = "COM7"  # Change this to your Arduino's serial port
+port = "COM15"  # Change this to your Arduino's serial port
 baud_rate = 9600
 
 # Initialize a queue for MySQL operations
@@ -21,11 +21,11 @@ mysql_queue = queue.Queue()
 
 # MySQL database configuration
 mysql_config = {
-    'host': 'fakeip',
+    'host': 'fake',
     'port': 3306,
-    'database': 'fakedb',
-    'user': 'fakeuser',
-    'password': 'fakepass@#'
+    'database': 'fake',
+    'user': 'fake',
+    'password': 'fake'
 }
 
 
@@ -214,30 +214,40 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
     def process_and_insert_data(sensor_values):
+        # Make sure every expected sensor key exists, fill missing ones with 'N/A'
+        for header in csv_headers:
+            if header not in sensor_values:
+                sensor_values[header] = 'N/A'  # Assign 'N/A' to missing sensor data
+        
         try:
-            print("Processing data for CSV and KML...")
-            # Process data here...
-            new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
-            coordinates.append(new_coords)
-            print(f"New coordinates: {new_coords}")
-            update_kml(kml, linestring, coordinates, new_coords)
+            # Prepare the row for the CSV
+            row = [sensor_values.get(header, 'N/A') for header in csv_headers]
             
-            print("Updating CSV file...")
-            with open(csv_file, 'a', newline='') as f:
-                csv_writer = csv.writer(f)
-                row = [sensor_values.get(header, 'N/A') for header in csv_headers]
-                print(f"CSV row: {row}")
+            # Print the row for debugging purposes
+            print("CSV row to write:", row)
+            
+            # Write the row to the CSV file
+            with open(csv_file, 'a', newline='') as csvfile:
+                csv_writer = csv.writer(csvfile)
                 csv_writer.writerow(row)
-    
-            print("Updating backup files...")
-            update_backup_files(backup_csv_file, backup_kml_file)
-    
-            # Enqueue data for MySQL insertion
-            data_for_mysql = tuple(sensor_values.get(header, 'N/A') for header in csv_headers)
-            mysql_queue.put(data_for_mysql)
-            print("Data enqueued for MySQL insertion.")
+            print("CSV row written successfully.")
+            
+            # Insert into MySQL and update KML only if essential data is present
+            essential_data_present = all(sensor_values.get(key) not in ['N/A', None, ''] for key in ['Longitude', 'Latitude', 'Altitude'])
+            if essential_data_present:
+                new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
+                # Update KML here based on new_coords
+                # Example: update_kml_function(new_coords)
+                
+                # Prepare data for MySQL
+                data_for_mysql = [sensor_values.get(header, 'N/A') for header in csv_headers]
+                mysql_queue.put(data_for_mysql)
+                print("Data enqueued for MySQL insertion.")
+            else:
+                print("Essential location data missing, not updating KML or MySQL.")
+
         except Exception as e:
-            print(f"Error in process_and_insert_data: {e}")
+            print(f"Error during data processing and insertion: {e}")
 
     try:
         while not stop_event.is_set():

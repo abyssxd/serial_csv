@@ -81,22 +81,25 @@ def create_mysql_connection_pool(pool_name="mysql_pool", pool_size=5):
 mysql_pool = create_mysql_connection_pool(pool_name="cansat_pool", pool_size=10)
 
 def insert_data_to_mysql():
+    print("MySQL insertion thread started.")
     while True:
         data = mysql_queue.get()
         if data is None:
+            print("Exiting MySQL insertion thread.")
             break  # Exit loop if None is received
 
-        connection = None
         try:
+            print("Getting connection from pool...")
             connection = mysql_pool.get_connection()
             cursor = connection.cursor()
+            print("Inserting data into MySQL...")
             insert_query = """
-            INSERT INTO sensor_data
-            (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status)
+            INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(insert_query, data)
             connection.commit()
+            print("Data inserted successfully.")
         except Error as e:
             print(f"Error inserting data into MySQL database: {e}")
         finally:
@@ -208,21 +211,31 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
-    def process_and_insert_data(sensor_values):
+def process_and_insert_data(sensor_values):
+    try:
+        print("Processing data for CSV and KML...")
         # Process data here...
         new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
         coordinates.append(new_coords)
+        print(f"New coordinates: {new_coords}")
         update_kml(kml, linestring, coordinates, new_coords)
         
+        print("Updating CSV file...")
         with open(csv_file, 'a', newline='') as f:
             csv_writer = csv.writer(f)
-            csv_writer.writerow([sensor_values.get(header, 'N/A') for header in csv_headers])  # Use 'N/A' for missing data
+            row = [sensor_values.get(header, 'N/A') for header in csv_headers]
+            print(f"CSV row: {row}")
+            csv_writer.writerow(row)
 
+        print("Updating backup files...")
         update_backup_files(backup_csv_file, backup_kml_file)
 
         # Enqueue data for MySQL insertion
         data_for_mysql = tuple(sensor_values.get(header, 'N/A') for header in csv_headers)
         mysql_queue.put(data_for_mysql)
+        print("Data enqueued for MySQL insertion.")
+    except Exception as e:
+        print(f"Error in process_and_insert_data: {e}")
 
     try:
         while not stop_event.is_set():

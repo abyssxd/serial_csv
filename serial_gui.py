@@ -269,12 +269,16 @@ def stop_reading(stop_event):
     
 
 def stop_mysql_thread():
-    mysql_queue.put(None)  # Signal the thread to exit
-    mysql_insertion_thread.join()
+    global mysql_insertion_thread  # This is to clearly indicate we're using the global variable
+    if mysql_insertion_thread is not None:
+        mysql_queue.put(None)  # Signal the thread to exit
+        mysql_insertion_thread.join()
+        mysql_insertion_thread = None  # Reset it so you can safely start it again if needed
 
 
 # Global variable to keep track of whether the MySQL insertion thread has been started
 mysql_thread_started = False
+mysql_insertion_thread = None
 
 # Function to handle start reading
 def start_reading(text_widget, stop_event):
@@ -285,7 +289,7 @@ def start_reading(text_widget, stop_event):
         # Start the MySQL insertion thread only if it hasn't been started already
         if not mysql_thread_started:
             print("Starting MySQL insertion thread...")
-            mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)
+            mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)  # This is now recognized as the global variable
             mysql_insertion_thread.start()
             mysql_thread_started = True
             print("MySQL insertion thread started.")

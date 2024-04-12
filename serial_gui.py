@@ -13,7 +13,7 @@ import queue
 import threading
 
 # Serial port configuration
-port = "COM15"  # Change this to your Arduino's serial port
+port = "COM4"  # Change this to your Arduino's serial port
 baud_rate = 9600
 
 # Initialize a queue for MySQL operations
@@ -21,11 +21,11 @@ mysql_queue = queue.Queue()
 
 # MySQL database configuration
 mysql_config = {
-    'host': 'fake',
+    'host': 'localhost',
     'port': 3306,
-    'database': 'fake',
-    'user': 'fake',
-    'password': 'fake'
+    'database': 'cansat',
+    'user': 'root',
+    'password': ''
 }
 
 
@@ -33,7 +33,7 @@ def rename_old_table_and_create_new(connection):
     cursor = connection.cursor()
     epoch_time = str(int(time.time()))
     new_table_name = "sensor_data_" + epoch_time
-    
+
     # Check if the old table exists and rename it
     cursor.execute("SHOW TABLES LIKE 'sensor_data'")
     result = cursor.fetchone()
@@ -41,35 +41,41 @@ def rename_old_table_and_create_new(connection):
         rename_query = f"RENAME TABLE sensor_data TO {new_table_name}"
         cursor.execute(rename_query)
         print(f"Old table renamed to {new_table_name}")
-    
-    # Create a new sensor_data table with the necessary schema
-    create_table_query = """
-    CREATE TABLE sensor_data (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        Time VARCHAR(255),
-        Temperature DOUBLE,
-        Pressure DOUBLE,
-        Altitude DOUBLE,
-        Latitude DOUBLE,
-        Longitude DOUBLE,
-        gps_altitude DOUBLE,
-        gps_sats INT,
-        gyro_x DOUBLE,
-        gyro_y DOUBLE,
-        gyro_z DOUBLE,
-        bmp_status INT,
-        gps_status INT,
-        gyro_status INT,
-        apc_status INT,
-        servo_status INT,
-        servo_rotation DOUBLE,
-        sd_status INT
-    )
-    """
-    cursor.execute(create_table_query)
-    print("New sensor_data table created.")
+
+    # Check if the new table name already exists to prevent duplicate table creation
+    cursor.execute("SHOW TABLES LIKE 'sensor_data'")
+    if not cursor.fetchone():
+        # Create a new sensor_data table with the necessary schema if it does not exist
+        create_table_query = """
+        CREATE TABLE sensor_data (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Time VARCHAR(255),
+            Temperature DOUBLE,
+            Pressure DOUBLE,
+            Altitude DOUBLE,
+            Latitude DOUBLE,
+            Longitude DOUBLE,
+            gps_altitude DOUBLE,
+            gps_sats INT,
+            gyro_x DOUBLE,
+            gyro_y DOUBLE,
+            gyro_z DOUBLE,
+            bmp_status INT,
+            gps_status INT,
+            gyro_status INT,
+            apc_status INT,
+            servo_status INT,
+            servo_rotation DOUBLE,
+            sd_status INT
+        )
+        """
+        cursor.execute(create_table_query)
+        print("New sensor_data table created.")
+    else:
+        print("Table 'sensor_data' already exists, not creating a new table.")
 
     cursor.close()
+
 
 def create_mysql_connection_pool(pool_name="mysql_pool", pool_size=5):
     pool = pooling.MySQLConnectionPool(pool_name=pool_name,
@@ -207,62 +213,54 @@ def add_line_text_widget(text_widget):
 csv_file = "sheet.csv"
 csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status"]
 
+import time
+
 def read_serial_data(text_widget, stop_event, ser, csv_file):
-    sensor_values = {key: None for key in csv_headers}  # Initialize sensor values
+    sensor_values = {key: 'N/A' for key in csv_headers}  # Initialize all sensor values with 'N/A'
+    new_data_received = False
     kml, linestring = create_kml()
     coordinates = load_existing_data(csv_file)
     backup_csv_file, backup_kml_file = create_backup_files(csv_file, "live_track.kml")
 
-    def process_and_insert_data(sensor_values):
-        # Make sure every expected sensor key exists, fill missing ones with 'N/A'
-        for header in csv_headers:
-            if header not in sensor_values:
-                sensor_values[header] = 'N/A'  # Assign 'N/A' to missing sensor data
-        
-        try:
-            # Prepare the row for the CSV
+    def process_and_insert_data():
+        nonlocal sensor_values
+        # Write the current state of sensor_values to CSV
+        with open(csv_file, 'a', newline='') as csvfile:
+            csv_writer = csv.writer(csvfile)
             row = [sensor_values.get(header, 'N/A') for header in csv_headers]
-            
-            # Print the row for debugging purposes
-            print("CSV row to write:", row)
-            
-            # Write the row to the CSV file
-            with open(csv_file, 'a', newline='') as csvfile:
-                csv_writer = csv.writer(csvfile)
-                csv_writer.writerow(row)
-            print("CSV row written successfully.")
-            
-            # Insert into MySQL and update KML only if essential data is present
-            essential_data_present = all(sensor_values.get(key) not in ['N/A', None, ''] for key in ['Longitude', 'Latitude', 'Altitude'])
-            if essential_data_present:
-                new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
-                # Update KML here based on new_coords
-                # Example: update_kml_function(new_coords)
-                
-                # Prepare data for MySQL
-                data_for_mysql = [sensor_values.get(header, 'N/A') for header in csv_headers]
-                mysql_queue.put(data_for_mysql)
-                print("Data enqueued for MySQL insertion.")
-            else:
-                print("Essential location data missing, not updating KML or MySQL.")
+            csv_writer.writerow(row)
+        print("CSV row written:", row)
 
-        except Exception as e:
-            print(f"Error during data processing and insertion: {e}")
+        # Update backup files
+        update_backup_files(backup_csv_file, backup_kml_file)
+        print("Backup files updated.")
+
+        # Insert data into MySQL
+        data_for_mysql = tuple(sensor_values.get(header, 'N/A') for header in csv_headers)
+        mysql_queue.put(data_for_mysql)
+        print("Data enqueued for MySQL insertion.")
+
+        # Update KML if latitude, longitude, and altitude are available
+        if all(sensor_values[key] != 'N/A' for key in ['Latitude', 'Longitude', 'Altitude']):
+            new_coords = (float(sensor_values['Longitude']), float(sensor_values['Latitude']), float(sensor_values['Altitude']))
+            update_kml(kml, linestring, coordinates, new_coords)
+            print("KML updated with new coordinates.")
 
     try:
         while not stop_event.is_set():
             if ser.in_waiting > 0:
                 data_line = ser.readline().decode('utf-8').rstrip()
                 add_data_to_text_widget(text_widget, data_line)
-                
-                sensor_type, sensor_value = parse_data(data_line)
-                if sensor_type in sensor_values:
-                    sensor_values[sensor_type] = sensor_value
-                    if all(value is not None for value in sensor_values.values()):
-                        process_and_insert_data(sensor_values)
-                        sensor_values = {key: None for key in csv_headers}  # Reset after processing
-                else:
-                    add_data_to_text_widget(text_widget, "Received malformed or unrecognized data line.")
+
+                key, value = parse_data(data_line)
+                if key:
+                    if key == 'Time' and new_data_received:  # Check if it's time for a new dataset
+                        process_and_insert_data()  # Process the previous dataset
+                        sensor_values = {k: 'N/A' for k in csv_headers}  # Reset for new data
+                        new_data_received = False
+                    sensor_values[key] = value  # Update sensor values dictionary with received data
+                    new_data_received = True
+
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}\n")
     except Exception as e:
@@ -270,6 +268,13 @@ def read_serial_data(text_widget, stop_event, ser, csv_file):
     finally:
         if ser.is_open:
             ser.close()
+        if new_data_received:
+            process_and_insert_data()  # Ensure the last set of data is processed
+
+
+# Global variable to keep track of whether the MySQL insertion thread has been started
+mysql_thread_started = False
+mysql_insertion_thread = None
 
 # Function to handle stop reading
 def stop_reading(stop_event):
@@ -285,11 +290,6 @@ def stop_mysql_thread():
         mysql_insertion_thread.join()
         mysql_insertion_thread = None  # Reset it so you can safely start it again if needed
 
-
-# Global variable to keep track of whether the MySQL insertion thread has been started
-mysql_thread_started = False
-mysql_insertion_thread = None
-
 # Function to handle start reading
 def start_reading(text_widget, stop_event):
     global mysql_thread_started
@@ -299,10 +299,17 @@ def start_reading(text_widget, stop_event):
         # Start the MySQL insertion thread only if it hasn't been started already
         if not mysql_thread_started:
             print("Starting MySQL insertion thread...")
-            mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)  # This is now recognized as the global variable
+            mysql_insertion_thread = threading.Thread(target=insert_data_to_mysql, daemon=True)
             mysql_insertion_thread.start()
             mysql_thread_started = True
             print("MySQL insertion thread started.")
+
+        # Connect to the database and prepare the table
+        print("Connecting to database and preparing tables...")
+        db_connection = mysql_pool.get_connection()
+        rename_old_table_and_create_new(db_connection)
+        db_connection.close()
+        print("Database is ready for new data.")
 
         # Create CSV file with headers if it doesn't exist
         if not os.path.exists(csv_file):
@@ -332,9 +339,13 @@ def start_reading(text_widget, stop_event):
     except serial.SerialException as e:
         add_data_to_text_widget(text_widget, f"Serial error: {e}")
         print(f"Serial error: {e}")
+    except Error as e:
+        add_data_to_text_widget(text_widget, f"Database error: {e}")
+        print(f"Database error: {e}")
     except Exception as e:
         add_data_to_text_widget(text_widget, f"Error: {e}")
         print(f"Error: {e}")
+
 
 # Function to reset CSV
 def reset_csv(text_widget):

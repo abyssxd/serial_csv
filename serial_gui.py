@@ -66,7 +66,8 @@ def rename_old_table_and_create_new(connection):
             apc_status INT,
             servo_status INT,
             servo_rotation DOUBLE,
-            sd_status INT
+            sd_status INT,
+            seeds_deployed INT
         )
         """
         cursor.execute(create_table_query)
@@ -100,8 +101,8 @@ def insert_data_to_mysql():
             cursor = connection.cursor()
             print("Inserting data into MySQL...")
             insert_query = """
-            INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status, seeds_deployed)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(insert_query, data)
             connection.commit()
@@ -211,7 +212,7 @@ def add_line_text_widget(text_widget):
 
 # CSV file configuration
 csv_file = "sheet.csv"
-csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status"]
+csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status", "seeds_deployed"]
 
 import time
 

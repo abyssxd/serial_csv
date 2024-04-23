@@ -5,6 +5,8 @@ import shutil
 import os
 from datetime import datetime
 import tkinter as tk
+from tkinter import ttk
+from ttkthemes import ThemedTk
 import mysql.connector
 from mysql.connector import Error
 from mysql.connector import pooling
@@ -13,7 +15,7 @@ import queue
 import threading
 
 # Serial port configuration
-port = "COM4"  # Change this to your Arduino's serial port
+port = "COM5"  # Change this to your Arduino's serial port
 baud_rate = 9600
 
 # Initialize a queue for MySQL operations
@@ -23,9 +25,9 @@ mysql_queue = queue.Queue()
 mysql_config = {
     'host': 'localhost',
     'port': 3306,
-    'database': 'cansat',
-    'user': 'root',
-    'password': ''
+    'database': 'ok',
+    'user': 'k',
+    'password': 'nah'
 }
 
 
@@ -66,8 +68,7 @@ def rename_old_table_and_create_new(connection):
             apc_status INT,
             servo_status INT,
             servo_rotation DOUBLE,
-            sd_status INT,
-            seeds_deployed INT
+            sd_status INT
         )
         """
         cursor.execute(create_table_query)
@@ -101,8 +102,8 @@ def insert_data_to_mysql():
             cursor = connection.cursor()
             print("Inserting data into MySQL...")
             insert_query = """
-            INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status, seeds_deployed)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO sensor_data (Time, Temperature, Pressure, Altitude, Latitude, Longitude, gps_altitude, gps_sats, gyro_x, gyro_y, gyro_z, bmp_status, gps_status, gyro_status, apc_status, servo_status, servo_rotation, sd_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(insert_query, data)
             connection.commit()
@@ -212,7 +213,7 @@ def add_line_text_widget(text_widget):
 
 # CSV file configuration
 csv_file = "sheet.csv"
-csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status", "seeds_deployed"]
+csv_headers = ["Time", "Temperature", "Pressure", "Altitude", "Latitude", "Longitude", "gps_altitude", "gps_sats", "gyro_x", "gyro_y", "gyro_z", "bmp_status", "gps_status", "gyro_status", "apc_status", "servo_status", "servo_rotation", "sd_status"]
 
 import time
 
@@ -362,40 +363,46 @@ def reset_csv(text_widget):
 
 
 # Tkinter UI setup
+
 def setup_ui():
-    root = tk.Tk()
+    root = ThemedTk(theme="Adapta")
     root.title("Vila2Sat Serial GUI")
     root.state('zoomed')
 
-    # Top frame for buttons
-    top_frame = tk.Frame(root)
+    style = ttk.Style(root)
+    background_color = style.lookup('TFrame', 'background')  # Getting the default background color of the theme
+
+    # Configuring button styles
+    style.configure('TButton', font=('Helvetica', 12), background=background_color)
+    style.configure('Green.TButton', foreground='green', background='green')
+    style.configure('Red.TButton', foreground='red', background='red')
+
+    # Adding a title label with the matching background
+    title_label = ttk.Label(root, text="Vila2Sat Serial Monitor", font=('Helvetica', 16, 'bold'), background=background_color)
+    title_label.pack(side=tk.TOP, pady=(10, 5), padx=10)
+
+    top_frame = ttk.Frame(root)
     top_frame.pack(side=tk.TOP, fill=tk.X, pady=20)
 
-    # Frame for Start and Stop buttons in the center
-    center_frame = tk.Frame(top_frame)
+    center_frame = ttk.Frame(top_frame)
     center_frame.pack(side=tk.TOP)
 
-    # Text widget in the remaining space
-    text_widget = tk.Text(root, state=tk.DISABLED)
-    text_widget.pack(expand=True, fill=tk.BOTH)
+    # Styling the text widget to have a slightly rounded border
+    text_widget = tk.Text(root, state=tk.DISABLED, bd=2, relief='groove', font=('Helvetica', 12))
+    text_widget.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
-    # Event object to control the reading thread
     stop_event = threading.Event()
 
-    # Start button
-    start_button = tk.Button(top_frame, text="Start Reading", command=lambda: start_reading(text_widget, stop_event))
+    start_button = ttk.Button(top_frame, text="Start Reading", style='Green.TButton', command=lambda: start_reading(text_widget, stop_event))
     start_button.pack(side=tk.LEFT, padx=5)
 
-    # Stop button
-    stop_button = tk.Button(top_frame, text="Stop Reading", command=lambda: stop_reading(stop_event))
+    stop_button = ttk.Button(top_frame, text="Stop Reading", style='Red.TButton', command=lambda: stop_reading(stop_event))
     stop_button.pack(side=tk.LEFT, padx=5)
 
-    # Reset button aligned to the right and colored red
-    reset_button = tk.Button(top_frame, text="Reset CSV", command=lambda: reset_csv(text_widget), bg='red', fg='white')
+    reset_button = ttk.Button(top_frame, text="Reset CSV", style='Red.TButton', command=lambda: reset_csv(text_widget))
     reset_button.pack(side=tk.RIGHT, padx=10)
 
     root.mainloop()
-
 
 if __name__ == "__main__":
     setup_ui()

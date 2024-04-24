@@ -30,6 +30,7 @@ You can find the Vila2Sat Dashboard this converts the data for here -> https://g
 4. Connect the arduino, esp32 or anything that prints serial data.
 5. Run the file with `python csv_conv.py` & it should start showing the serial data & saving it in the csv file.
 
+## License
 Shield: [![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
 
 This work is licensed under a

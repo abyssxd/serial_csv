@@ -11,14 +11,14 @@ This uses its own serial monitor using `pyserial`, it makes the serial monitor s
 This uses its own serial monitor using `pyserial`, it makes the serial monitor show up in the terminal you run the converter in, and while its being monitored, it updates and saves to the output csv file.
 - Use `python serial_gui` to open the GUI serial monitor (both save and update the csv & kml files)
 ### Vila2Sat Serial GUI
-![alt text](https://cdn.discordapp.com/attachments/773822498717696030/1199833004458135643/image.png)
+![lv_0_20240423192634](https://github.com/abyssxd/vila2sat_serial/assets/57658642/bdd441de-afb6-4ffe-a328-baaa17033094)
 
 ## Google Earth Screenshots
 ***This track was made using fake data for visual representation.***
 ### Camera View
-![alt text](https://cdn.discordapp.com/attachments/937704145828331521/1199447710596603924/image.png)
+- Will add soon.
 ### Overview
-![alt text](https://cdn.discordapp.com/attachments/937704145828331521/1199447822303506442/image.png)
+- Will add soon.
 
 ## DashBoard
 You can find the Vila2Sat Dashboard this converts the data for here -> https://github.com/abyssxd/cansat_vila2sat
